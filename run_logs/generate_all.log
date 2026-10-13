@@ -1,0 +1,35 @@
+D:\Cogniva_Celebrity_Recognition_Final\.venv\Lib\site-packages\insightface\utils\face_align.py:23: FutureWarning: `estimate` is deprecated since version 0.26 and will be removed in version 2.2. Please use `SimilarityTransform.from_estimate` class constructor instead.
+  tform.estimate(lmk, dst)
+[OK] Akshay Kumar: 49 embeddings, 0 skipped, dimension=512
+[OK] Alexandra Daddario: 49 embeddings, 0 skipped, dimension=512
+[OK] Alia Bhatt: 49 embeddings, 0 skipped, dimension=512
+[OK] Amitabh Bachchan: 49 embeddings, 0 skipped, dimension=512
+[OK] Andy Samberg: 47 embeddings, 0 skipped, dimension=512
+[OK] Anushka Sharma: 48 embeddings, 0 skipped, dimension=512
+[OK] Billie Eilish: 49 embeddings, 0 skipped, dimension=512
+[OK] Brad Pitt: 49 embeddings, 0 skipped, dimension=512
+[OK] Camila Cabello: 49 embeddings, 0 skipped, dimension=512
+[OK] Charlize Theron: 49 embeddings, 0 skipped, dimension=512
+[OK] Claire Holt: 49 embeddings, 0 skipped, dimension=512
+[OK] Courtney Cox: 47 embeddings, 0 skipped, dimension=512
+[OK] Dwayne Johnson: 49 embeddings, 0 skipped, dimension=512
+[OK] Elizabeth Olsen: 49 embeddings, 0 skipped, dimension=512
+[OK] Ellen Degeneres: 49 embeddings, 0 skipped, dimension=512
+[OK] Henry Cavill: 49 embeddings, 0 skipped, dimension=512
+[OK] Hrithik Roshan: 49 embeddings, 0 skipped, dimension=512
+[OK] Hugh Jackman: 49 embeddings, 0 skipped, dimension=512
+[OK] Jessica Alba: 49 embeddings, 0 skipped, dimension=512
+[OK] Kashyap: 30 embeddings, 0 skipped, dimension=512
+[OK] Lisa Kudrow: 48 embeddings, 0 skipped, dimension=512
+[OK] Margot Robbie: 49 embeddings, 0 skipped, dimension=512
+[OK] Marmik: 32 embeddings, 0 skipped, dimension=512
+[OK] Natalie Portman: 49 embeddings, 0 skipped, dimension=512
+[OK] Priyanka Chopra: 49 embeddings, 0 skipped, dimension=512
+[OK] Robert Downey Jr: 49 embeddings, 0 skipped, dimension=512
+[OK] Roger Federer: 45 embeddings, 0 skipped, dimension=512
+[OK] Tom Cruise: 49 embeddings, 0 skipped, dimension=512
+[OK] Vijay Deverakonda: 46 embeddings, 0 skipped, dimension=512
+[OK] Virat Kohli: 49 embeddings, 0 skipped, dimension=512
+[OK] Zac Efron: 49 embeddings, 0 skipped, dimension=512
+Database built for 31 identities.
+Test cases: 1485 written to D:\Cogniva_Celebrity_Recognition_Final\metadata\test_cases.csv

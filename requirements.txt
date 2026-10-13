@@ -1,0 +1,11 @@
+kagglehub
+insightface
+onnxruntime
+opencv-python
+numpy
+fastapi
+uvicorn[standard]
+python-multipart
+Pillow
+pytest
+openpyxl

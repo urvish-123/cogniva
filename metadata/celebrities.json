@@ -1,0 +1,250 @@
+[
+  {
+    "id": 1,
+    "name": "Akshay Kumar",
+    "folder": "Akshay_Kumar",
+    "category": "Actor / Producer",
+    "language": "Hindi",
+    "description": "Indian film actor and producer"
+  },
+  {
+    "id": 2,
+    "name": "Alexandra Daddario",
+    "folder": "Alexandra_Daddario",
+    "category": "Actress",
+    "language": "English",
+    "description": "American actress (Percy Jackson, Baywatch)"
+  },
+  {
+    "id": 3,
+    "name": "Alia Bhatt",
+    "folder": "Alia_Bhatt",
+    "category": "Actress / Producer",
+    "language": "Hindi",
+    "description": "Indian film actress and producer"
+  },
+  {
+    "id": 4,
+    "name": "Amitabh Bachchan",
+    "folder": "Amitabh_Bachchan",
+    "category": "Actor / TV Host",
+    "language": "Hindi",
+    "description": "Indian film actor and host of Kaun Banega Crorepati"
+  },
+  {
+    "id": 5,
+    "name": "Andy Samberg",
+    "folder": "Andy_Samberg",
+    "category": "Actor / Comedian",
+    "language": "English",
+    "description": "American actor and comedian (Brooklyn Nine-Nine)"
+  },
+  {
+    "id": 6,
+    "name": "Anushka Sharma",
+    "folder": "Anushka_Sharma",
+    "category": "Actress / Producer",
+    "language": "Hindi",
+    "description": "Indian film actress and producer"
+  },
+  {
+    "id": 7,
+    "name": "Billie Eilish",
+    "folder": "Billie_Eilish",
+    "category": "Singer",
+    "language": "English",
+    "description": "American singer-songwriter"
+  },
+  {
+    "id": 8,
+    "name": "Brad Pitt",
+    "folder": "Brad_Pitt",
+    "category": "Actor / Producer",
+    "language": "English",
+    "description": "American film actor and producer"
+  },
+  {
+    "id": 9,
+    "name": "Camila Cabello",
+    "folder": "Camila_Cabello",
+    "category": "Singer",
+    "language": "English / Spanish",
+    "description": "Cuban-American singer-songwriter"
+  },
+  {
+    "id": 10,
+    "name": "Charlize Theron",
+    "folder": "Charlize_Theron",
+    "category": "Actress / Producer",
+    "language": "English",
+    "description": "South African-American actress and producer"
+  },
+  {
+    "id": 11,
+    "name": "Claire Holt",
+    "folder": "Claire_Holt",
+    "category": "Actress",
+    "language": "English",
+    "description": "Australian actress (The Vampire Diaries, The Originals)"
+  },
+  {
+    "id": 12,
+    "name": "Courtney Cox",
+    "folder": "Courtney_Cox",
+    "category": "Actress",
+    "language": "English",
+    "description": "American actress (Friends)"
+  },
+  {
+    "id": 13,
+    "name": "Dwayne Johnson",
+    "folder": "Dwayne_Johnson",
+    "category": "Actor / Wrestler",
+    "language": "English",
+    "description": "American actor and former professional wrestler"
+  },
+  {
+    "id": 14,
+    "name": "Elizabeth Olsen",
+    "folder": "Elizabeth_Olsen",
+    "category": "Actress",
+    "language": "English",
+    "description": "American actress (Marvel Cinematic Universe)"
+  },
+  {
+    "id": 15,
+    "name": "Ellen Degeneres",
+    "folder": "Ellen_Degeneres",
+    "category": "TV Host / Comedian",
+    "language": "English",
+    "description": "American comedian and talk-show host"
+  },
+  {
+    "id": 16,
+    "name": "Henry Cavill",
+    "folder": "Henry_Cavill",
+    "category": "Actor",
+    "language": "English",
+    "description": "British actor (Superman, The Witcher)"
+  },
+  {
+    "id": 17,
+    "name": "Hrithik Roshan",
+    "folder": "Hrithik_Roshan",
+    "category": "Actor",
+    "language": "Hindi",
+    "description": "Indian film actor"
+  },
+  {
+    "id": 18,
+    "name": "Hugh Jackman",
+    "folder": "Hugh_Jackman",
+    "category": "Actor",
+    "language": "English",
+    "description": "Australian actor (X-Men)"
+  },
+  {
+    "id": 19,
+    "name": "Jessica Alba",
+    "folder": "Jessica_Alba",
+    "category": "Actress / Entrepreneur",
+    "language": "English",
+    "description": "American actress and businesswoman"
+  },
+  {
+    "id": 20,
+    "name": "Kashyap",
+    "folder": "Kashyap",
+    "category": "Other",
+    "language": "",
+    "description": ""
+  },
+  {
+    "id": 21,
+    "name": "Lisa Kudrow",
+    "folder": "Lisa_Kudrow",
+    "category": "Actress",
+    "language": "English",
+    "description": "American actress (Friends)"
+  },
+  {
+    "id": 22,
+    "name": "Margot Robbie",
+    "folder": "Margot_Robbie",
+    "category": "Actress / Producer",
+    "language": "English",
+    "description": "Australian actress and producer"
+  },
+  {
+    "id": 23,
+    "name": "Marmik",
+    "folder": "Marmik",
+    "category": "Other",
+    "language": "",
+    "description": ""
+  },
+  {
+    "id": 24,
+    "name": "Natalie Portman",
+    "folder": "Natalie_Portman",
+    "category": "Actress",
+    "language": "English",
+    "description": "Israeli-American actress"
+  },
+  {
+    "id": 25,
+    "name": "Priyanka Chopra",
+    "folder": "Priyanka_Chopra",
+    "category": "Actress / Producer",
+    "language": "Hindi / English",
+    "description": "Indian actress and producer"
+  },
+  {
+    "id": 26,
+    "name": "Robert Downey Jr",
+    "folder": "Robert_Downey_Jr",
+    "category": "Actor",
+    "language": "English",
+    "description": "American actor (Iron Man)"
+  },
+  {
+    "id": 27,
+    "name": "Roger Federer",
+    "folder": "Roger_Federer",
+    "category": "Tennis Player",
+    "language": "English",
+    "description": "Swiss former professional tennis player"
+  },
+  {
+    "id": 28,
+    "name": "Tom Cruise",
+    "folder": "Tom_Cruise",
+    "category": "Actor / Producer",
+    "language": "English",
+    "description": "American film actor and producer"
+  },
+  {
+    "id": 29,
+    "name": "Vijay Deverakonda",
+    "folder": "Vijay_Deverakonda",
+    "category": "Actor",
+    "language": "Telugu",
+    "description": "Indian film actor (Telugu cinema)"
+  },
+  {
+    "id": 30,
+    "name": "Virat Kohli",
+    "folder": "Virat_Kohli",
+    "category": "Cricketer",
+    "language": "Hindi / English",
+    "description": "Indian international cricketer"
+  },
+  {
+    "id": 31,
+    "name": "Zac Efron",
+    "folder": "Zac_Efron",
+    "category": "Actor",
+    "language": "English",
+    "description": "American actor"
+  }
+]
