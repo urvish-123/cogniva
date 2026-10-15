@@ -1,5 +1,31 @@
 # CognivaEyewear Celebrity Recognition — Final Project
 
+## Celebrity + object recognition (merged)
+
+Upload one image and the app tells you whether it shows a **celebrity** or an **object**, and how long recognition took.
+
+```text
+image ─► face detection (InsightFace)
+          ├─ face matches a celebrity (ArcFace)      ─► type: celebrity
+          ├─ more than one face                     ─► type: unknown
+          └─ no face / unknown face ─► CLIP object match ─► type: object | unknown
+```
+
+- Celebrities: ArcFace embeddings vs the `celebrities` table (unchanged logic below).
+- Objects: CLIP `openai/clip-vit-base-patch32` embeddings vs the `objects` table. Merged from the object-recognition project (8 classes, 80/20 train/test split in `object_dataset/`).
+- The two embedding types are stored in separate tables and never compared with each other.
+- Every response includes `processing_time` (`face_ms`, `object_ms`, `total_ms`, `request_ms`).
+
+Object setup (once, after `pip install -r requirements.txt`):
+
+```bash
+python -m src.generate_object_centroids   # object_dataset/train -> objects table
+python -m src.evaluate_objects            # accuracy + time per image on object_dataset/test
+python -m src.pipeline path/to/image.jpg  # one image through the full pipeline
+```
+
+Object categories come from `metadata/objects.xlsx` (`Object`, `Category` columns).
+
 ## What this project does
 
 This is a data and embedding engineering implementation for an offline-oriented celebrity recognition prototype.
@@ -11,6 +37,7 @@ It does **not** train a new face-recognition model. It uses a pretrained Insight
 - Python
 - InsightFace / ArcFace
 - RetinaFace-compatible detection through InsightFace
+- CLIP (PyTorch + Hugging Face Transformers) for object recognition
 - OpenCV
 - NumPy
 - SQLite (Python standard library)

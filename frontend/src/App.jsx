@@ -2,12 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 const MESSAGES = {
   unknown: {
-    title: "Celebrity not recognized",
-    text: "This face does not match anyone in our celebrity database.",
-  },
-  no_face: {
-    title: "No face detected",
-    text: "Please upload a clear photo where the face is visible.",
+    title: "Not recognized",
+    text: "This image does not match any celebrity or object in our database.",
   },
   multiple_faces: {
     title: "Multiple faces detected",
@@ -15,26 +11,52 @@ const MESSAGES = {
   },
   database_empty: {
     title: "Database is empty",
-    text: "Build the celebrity database before running recognition.",
+    text: "Build the celebrity and object databases before running recognition.",
   },
 };
 
-const STEPS = [
-  { title: "Detect", text: "Locates and aligns the face in your photo." },
-  { title: "Embed", text: "ArcFace turns the face into a 512-number signature." },
-  { title: "Match", text: "Compares it with every celebrity in the database." },
-];
+function unknownMessage(result) {
+  const faceStatus = result.celebrity?.status;
+  if (faceStatus === "multiple_faces") return MESSAGES.multiple_faces;
+  if (faceStatus === "database_empty" && result.object?.status === "database_empty") {
+    return MESSAGES.database_empty;
+  }
+  return MESSAGES.unknown;
+}
 
-function GlassesLogo({ size = 22 }) {
-  return (
-    <svg viewBox="0 0 32 32" width={size} height={size} fill="none"
-      stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-      <circle cx="9" cy="17" r="5.5" />
-      <circle cx="23" cy="17" r="5.5" />
-      <path d="M14.5 16.5c1-1 2-1 3 0" />
-      <path d="M3.5 15 2 11M28.5 15 30 11" />
-    </svg>
-  );
+// Models never need more than this (face detector runs at 640, CLIP at 224),
+// so larger photos are downscaled in the browser before upload.
+const MAX_SIDE = 1280;
+
+async function shrinkImage(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = MAX_SIDE / Math.max(bitmap.width, bitmap.height);
+    if (scale >= 1) {
+      bitmap.close();
+      return file;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff"; // transparent PNG areas -> white, not black
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.92)
+    );
+    if (!blob) return file;
+    const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], name, { type: "image/jpeg" });
+  } catch {
+    return file; // browser can't decode it; let the server validate it
+  }
+}
+
+function seconds(ms) {
+  return `${(ms / 1000).toFixed(2)} s`;
 }
 
 export default function App() {
@@ -78,8 +100,9 @@ export default function App() {
     setError("");
 
     try {
+      const upload = await shrinkImage(file);
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", upload, upload.name);
       const response = await fetch("/recognize", { method: "POST", body: form });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Recognition failed.");
@@ -101,43 +124,23 @@ export default function App() {
     selectFile(event.dataTransfer.files[0]);
   }
 
-  const matched = result?.status === "match";
-
   return (
     <div className="page">
-      <div className="aurora" aria-hidden="true">
-        <span className="blob blob-1" />
-        <span className="blob blob-2" />
-        <span className="blob blob-3" />
-      </div>
-
       <header className="navbar">
-        <div className="brand">
-          <span className="brand-mark"><GlassesLogo /></span>
-          <span className="brand-text">
-            Cogniva<span className="gradient-text">Eyewear</span>
-          </span>
-        </div>
-        <span className="nav-pill">
-          <span className="live-dot" /> AI Face Recognition
-        </span>
+        <span className="brand-text">CognivaEyewear</span>
+        <span className="nav-note">Celebrity &amp; Object Recognition</span>
       </header>
 
       <main className="container">
         <section className="hero">
-          <span className="badge">Powered by InsightFace · ArcFace</span>
-          <h1>
-            CognivaEyewear
-            <br />
-            <span className="gradient-text">Celebrity Recognition</span>
-          </h1>
+          <h1>Celebrity &amp; Object Recognition</h1>
           <p>
-            Upload a photo and identify the celebrity in seconds using
-            deep-learning face embeddings.
+            Upload a photo to find out which celebrity or object it shows,
+            and how long it took to recognize.
           </p>
         </section>
 
-        <section className={`card ${matched ? "card-success" : ""}`}>
+        <section className="card">
           {!preview ? (
             <div
               className={`dropzone ${dragging ? "dragging" : ""}`}
@@ -149,51 +152,28 @@ export default function App() {
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
             >
-              <div className="drop-icon">
-                <svg viewBox="0 0 24 24" width="30" height="30" fill="none"
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-                  strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-              </div>
-              <p className="drop-title">Drop a celebrity photo here</p>
+              <p className="drop-title">Drop a celebrity or object photo here</p>
               <p className="drop-sub">or <u>browse your files</u> · JPG, PNG, WEBP</p>
             </div>
           ) : (
             <div className="workspace">
-              <div className={`preview ${loading ? "is-scanning" : ""}`}>
+              <div className="preview">
                 <img src={preview} alt="Uploaded" />
-                <span className="corner tl" />
-                <span className="corner tr" />
-                <span className="corner bl" />
-                <span className="corner br" />
-                {loading && <div className="scan-line" />}
               </div>
 
               <div className="side">
-                <div className="file-row">
-                  <span className="file-icon">IMG</span>
-                  <p className="file-name" title={file.name}>{file.name}</p>
-                </div>
+                <p className="file-name" title={file.name}>{file.name}</p>
 
                 {!result && (
                   <button className="btn primary" onClick={recognize}
                     disabled={loading}>
-                    {loading ? (
-                      <>
-                        <span className="spinner" /> Analyzing face...
-                      </>
-                    ) : (
-                      "Recognize Celebrity"
-                    )}
+                    {loading ? "Recognizing..." : "Recognize"}
                   </button>
                 )}
 
                 {!result && !loading && (
                   <p className="hint">
-                    Tip: a clear, front-facing photo of one person works best.
+                    Tip: use a clear photo of one person or one object.
                   </p>
                 )}
 
@@ -207,7 +187,7 @@ export default function App() {
             </div>
           )}
 
-          {matched && <DetailsPanel result={result} />}
+          {result?.type === "celebrity" && <DetailsPanel result={result.celebrity} />}
 
           {error && <div className="error">{error}</div>}
 
@@ -220,20 +200,10 @@ export default function App() {
           />
         </section>
 
-        <section className="steps">
-          {STEPS.map((step, i) => (
-            <div className="step" key={step.title}>
-              <span className="step-num">0{i + 1}</span>
-              <h3>{step.title}</h3>
-              <p>{step.text}</p>
-            </div>
-          ))}
-        </section>
       </main>
 
       <footer className="footer">
-        <GlassesLogo size={16} />
-        © {new Date().getFullYear()} CognivaEyewear Celebrity Recognition
+        © {new Date().getFullYear()} CognivaEyewear Celebrity &amp; Object Recognition
       </footer>
     </div>
   );
@@ -263,49 +233,48 @@ function DetailsPanel({ result }) {
 }
 
 function ResultCard({ result }) {
-  if (result.status === "match") {
-    const initials = result.name
-      .split(" ")
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join("");
+  if (result.type === "celebrity" || result.type === "object") {
+    const isCelebrity = result.type === "celebrity";
+    const match = isCelebrity ? result.celebrity : result.object;
 
     return (
       <div className="result match">
-        <div className="result-head">
-          <span className="avatar">{initials}</span>
-          <div>
-            <span className="result-label">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
-                stroke="currentColor" strokeWidth="3" strokeLinecap="round"
-                strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Celebrity identified
-            </span>
-            <h2>{result.name}</h2>
-          </div>
+        <span className="result-label">
+          {isCelebrity ? "Celebrity identified" : "Object identified"}
+        </span>
+        <h2>{match.name}</h2>
+        <div className="result-meta">
+          <span className="chip">{isCelebrity ? "Celebrity" : "Object"}</span>
+          {match.category && <span className="chip">{match.category}</span>}
+          {match.description && <span>{match.description}</span>}
+          <span className="score">
+            Similarity {(match.score * 100).toFixed(1)}%
+          </span>
         </div>
-        {(result.category || result.description) && (
-          <div className="result-meta">
-            {result.category && <span className="chip">{result.category}</span>}
-            {result.description && <span>{result.description}</span>}
-          </div>
-        )}
+        <ProcessingTime time={result.processing_time} />
       </div>
     );
   }
 
-  const message = MESSAGES[result.status] || {
-    title: "Something went wrong",
-    text: result.message || "Please try again.",
-  };
+  const message = unknownMessage(result);
 
   return (
     <div className="result warn">
       <span className="result-label">Result</span>
       <h2>{message.title}</h2>
       <p className="result-text">{message.text}</p>
+      <ProcessingTime time={result.processing_time} />
+    </div>
+  );
+}
+
+function ProcessingTime({ time }) {
+  if (!time) return null;
+  return (
+    <div className="timing">
+      <span>
+        Total processing time: <strong>{seconds(time.total_ms)}</strong>
+      </span>
     </div>
   );
 }

@@ -22,6 +22,19 @@ CREATE TABLE IF NOT EXISTS celebrities (
 )
 """
 
+# CLIP object centroids. Separate table: never compared with ArcFace vectors.
+OBJECT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS objects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    category TEXT,
+    centroid_embedding BLOB NOT NULL,
+    embedding_dimension INTEGER NOT NULL,
+    sample_count INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+"""
+
 
 @contextmanager
 def connection():
@@ -40,6 +53,7 @@ def init_database():
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_celebrities_name ON celebrities(name)"
         )
+        conn.execute(OBJECT_SCHEMA)
 
 
 def database_available():
@@ -119,3 +133,54 @@ def get_all_celebrities():
             "sample_count": row[8],
         })
     return records
+
+
+def clear_objects():
+    init_database()
+    with connection() as conn:
+        conn.execute("DELETE FROM objects")
+
+
+def upsert_object(name, centroid, sample_count, category=""):
+    centroid = np.asarray(centroid, dtype=np.float32)
+
+    with connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO objects
+              (name, category, centroid_embedding, embedding_dimension,
+               sample_count)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(name) DO UPDATE SET
+              category=excluded.category,
+              centroid_embedding=excluded.centroid_embedding,
+              embedding_dimension=excluded.embedding_dimension,
+              sample_count=excluded.sample_count
+            """,
+            (name, category, centroid.tobytes(), int(centroid.shape[0]),
+             int(sample_count)),
+        )
+
+
+def get_all_objects():
+    init_database()
+    with connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, name, category, centroid_embedding,
+                   embedding_dimension, sample_count
+            FROM objects
+            ORDER BY name
+            """
+        ).fetchall()
+
+    return [
+        {
+            "id": row[0],
+            "name": row[1],
+            "category": row[2],
+            "centroid": np.frombuffer(row[3], dtype=np.float32, count=row[4]),
+            "sample_count": row[5],
+        }
+        for row in rows
+    ]

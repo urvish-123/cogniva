@@ -18,7 +18,8 @@ def cosine_similarity(a, b):
 
 def recognize_image(image_path: Path, threshold=SIMILARITY_THRESHOLD):
     image = read_image(image_path)
-    faces = detect_faces(image)
+    # Detect first; the costly embedding runs only for a single-face image.
+    faces = detect_faces(image, embed=False)
 
     if len(faces) == 0:
         return {
@@ -32,7 +33,7 @@ def recognize_image(image_path: Path, threshold=SIMILARITY_THRESHOLD):
             "message": f"{len(faces)} faces detected. Please use one face.",
         }
 
-    query = normalized_embedding(faces[0])
+    query = normalized_embedding(faces[0], image)
     celebrities = get_all_celebrities()
 
     if not celebrities:

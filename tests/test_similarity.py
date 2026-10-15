@@ -27,7 +27,7 @@ def fake_pipeline(monkeypatch, query, faces=1):
     ]
     monkeypatch.setattr(recognize_module, "read_image", lambda path: None)
     monkeypatch.setattr(
-        recognize_module, "detect_faces", lambda image: [face] * faces)
+        recognize_module, "detect_faces", lambda image, **kw: [face] * faces)
     monkeypatch.setattr(
         recognize_module, "get_all_celebrities", lambda: celebrities)
 

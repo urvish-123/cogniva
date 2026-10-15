@@ -1,4 +1,4 @@
-# API Documentation — CognivaEyewear Celebrity Recognition
+# API Documentation — CognivaEyewear Celebrity & Object Recognition
 
 FastAPI backend defined in `app/main.py`.
 
@@ -17,7 +17,7 @@ FastAPI backend defined in `app/main.py`.
 |---|---|---|
 | `GET` | `/` | Minimal built-in HTML upload page |
 | `GET` | `/health` | Service and database status |
-| `POST` | `/recognize` | Identify the celebrity in an uploaded face image |
+| `POST` | `/recognize` | Identify the celebrity or object in an uploaded image |
 
 ---
 
@@ -29,14 +29,13 @@ Returns a simple HTML page (`text/html`) with a file picker that calls `POST /re
 
 ## `GET /health`
 
-Reports whether the server is running and whether the SQLite database can be queried.
-
 **Response `200 OK`**
 
 ```json
 {
   "status": "ok",
-  "database_exists": true
+  "database_exists": true,
+  "object_classes": 8
 }
 ```
 
@@ -44,18 +43,29 @@ Reports whether the server is running and whether the SQLite database can be que
 |---|---|---|
 | `status` | string | Always `"ok"` when the server responds |
 | `database_exists` | boolean | `true` if the `celebrities` table exists and can be queried |
-
-**Example**
-
-```bash
-curl http://127.0.0.1:8000/health
-```
+| `object_classes` | integer | Number of object centroids in the `objects` table |
 
 ---
 
 ## `POST /recognize`
 
-Detects the face in an uploaded image, computes its ArcFace embedding, and compares it to every celebrity centroid in the database using cosine similarity. The best score must be **greater than 0.80** to count as a match (`SIMILARITY_THRESHOLD` in `src/config.py`).
+Two specialised models are used, and their embeddings are never compared with each other:
+
+| Step | Model | Compared against |
+|---|---|---|
+| 1. Face | InsightFace `buffalo_l` (RetinaFace detection + ArcFace) | `celebrities` table |
+| 2. Object | CLIP `openai/clip-vit-base-patch32` | `objects` table |
+
+Decision logic (`src/pipeline.py`):
+
+1. Run face recognition (unchanged celebrity logic, threshold `SIMILARITY_THRESHOLD`).
+   - Celebrity match → `type: "celebrity"`, CLIP is skipped.
+   - More than one face → `type: "unknown"` (one face per image, as before).
+2. No face, or a face that matches no celebrity → run CLIP object recognition (threshold `OBJECT_SIMILARITY_THRESHOLD`).
+   - Object match → `type: "object"`.
+   - Otherwise → `type: "unknown"`.
+
+Both thresholds are in `src/config.py`. A score must be **greater than** the threshold to count as a match.
 
 ### Request
 
@@ -63,116 +73,69 @@ Detects the face in an uploaded image, computes its ArcFace embedding, and compa
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `file` | file | Yes | Image containing exactly one face. The part's content type must start with `image/` (JPG, PNG and WEBP are supported). |
-
-**Example**
+| `file` | file | Yes | JPG, PNG or WEBP image, at most 10 MB |
 
 ```bash
-curl -X POST http://127.0.0.1:8000/recognize \
-     -F "file=@test_images/virat_test.jpg"
-```
-
-```javascript
-const form = new FormData();
-form.append("file", fileInput.files[0]);
-const res = await fetch("http://127.0.0.1:8000/recognize", { method: "POST", body: form });
-const data = await res.json();
+curl -X POST http://127.0.0.1:8000/recognize -F "file=@test_images/virat_test.jpg"
 ```
 
 ### Response `200 OK`
 
-Every processed image returns HTTP 200. The `status` field gives the outcome:
-
-| `status` | Meaning |
-|---|---|
-| `match` | One face was found and the best score is above the threshold |
-| `unknown` | One face was found but no celebrity scored above the threshold |
-| `no_face` | No face was detected |
-| `multiple_faces` | More than one face was detected |
-| `database_empty` | The database has no celebrities. Build it with `python -m src.generate_centroids` |
-
-#### `match`
-
-```json
-{
-  "status": "match",
-  "name": "Zac Efron",
-  "category": "Actor",
-  "description": "American actor",
-  "details": {
-    "Category": "Actor",
-    "Language": "English",
-    "Description": "American actor"
-  },
-  "score": 0.8265,
-  "threshold": 0.8,
-  "sample_count": 49,
-  "top_matches": [
-    { "name": "Zac Efron", "score": 0.8265 },
-    { "name": "Hrithik Roshan", "score": 0.2255 },
-    { "name": "Virat Kohli", "score": 0.1815 },
-    { "name": "Brad Pitt", "score": 0.1401 },
-    { "name": "Ellen Degeneres", "score": 0.1312 }
-  ]
-}
-```
-
 | Field | Type | Description |
 |---|---|---|
-| `status` | string | `"match"` |
-| `name` | string | Matched celebrity name |
-| `category` | string | Category from the celebrity metadata |
-| `description` | string | Short description from the metadata |
-| `details` | object | Every column of the celebrity's row in `metadata/celebrities.xlsx`. Keys vary by celebrity. |
-| `score` | number | Cosine similarity to the best centroid, rounded to 4 decimals (range −1 to 1) |
-| `threshold` | number | Threshold used for the decision |
-| `sample_count` | integer | Number of images averaged into the matched centroid |
-| `top_matches` | array | Up to 5 best candidates, `{name, score}`, highest score first |
+| `type` | string | `"celebrity"`, `"object"` or `"unknown"` |
+| `celebrity` | object | Face recognition result (always present). Same fields as before: `status` is `match`, `unknown`, `no_face`, `multiple_faces` or `database_empty` |
+| `object` | object or null | CLIP result, or `null` when CLIP was skipped. `status` is `match`, `unknown` or `database_empty` |
+| `processing_time` | object | Milliseconds: `face_ms`, `object_ms` (only if CLIP ran), `total_ms` (recognition), `request_ms` (validation + recognition) |
 
-#### `unknown`
+#### Celebrity image
 
 ```json
 {
-  "status": "unknown",
-  "name": "Unknown",
-  "score": 0.6837,
-  "threshold": 0.8,
-  "top_matches": [
-    { "name": "Akshay Kumar", "score": 0.6837 },
-    { "name": "Hrithik Roshan", "score": 0.1558 },
-    { "name": "Lisa Kudrow", "score": 0.1384 },
-    { "name": "Priyanka Chopra", "score": 0.1092 },
-    { "name": "Billie Eilish", "score": 0.0995 }
-  ]
+  "type": "celebrity",
+  "celebrity": {
+    "status": "match",
+    "name": "Zac Efron",
+    "category": "Actor",
+    "description": "American actor",
+    "details": { "Category": "Actor", "Language": "English" },
+    "score": 0.8265,
+    "threshold": 0.8,
+    "sample_count": 49,
+    "top_matches": [{ "name": "Zac Efron", "score": 0.8265 }]
+  },
+  "object": null,
+  "processing_time": { "face_ms": 142.3, "total_ms": 142.4, "request_ms": 150.9 }
 }
 ```
 
-`name` is always `"Unknown"`. `score` is the best score found, which was not above `threshold`.
-
-#### `no_face`
+#### Object image
 
 ```json
 {
-  "status": "no_face",
-  "message": "No face detected."
+  "type": "object",
+  "celebrity": { "status": "no_face", "message": "No face detected." },
+  "object": {
+    "status": "match",
+    "name": "Bed",
+    "category": "Furniture",
+    "score": 0.8731,
+    "threshold": 0.8,
+    "sample_count": 27,
+    "top_matches": [{ "name": "Bed", "score": 0.8731 }, { "name": "Armchair", "score": 0.7412 }]
+  },
+  "processing_time": { "face_ms": 98.1, "object_ms": 187.6, "total_ms": 285.8, "request_ms": 291.2 }
 }
 ```
 
-#### `multiple_faces`
+#### Not recognized
 
 ```json
 {
-  "status": "multiple_faces",
-  "message": "2 faces detected. Please use one face."
-}
-```
-
-#### `database_empty`
-
-```json
-{
-  "status": "database_empty",
-  "message": "No celebrity embeddings are stored in the database."
+  "type": "unknown",
+  "celebrity": { "status": "no_face", "message": "No face detected." },
+  "object": { "status": "unknown", "name": "Unknown", "score": 0.61, "threshold": 0.8, "top_matches": [] },
+  "processing_time": { "face_ms": 95.0, "object_ms": 180.2, "total_ms": 275.3, "request_ms": 280.0 }
 }
 ```
 
@@ -180,12 +143,11 @@ Every processed image returns HTTP 200. The `status` field gives the outcome:
 
 | HTTP code | When | Body |
 |---|---|---|
-| `400 Bad Request` | The uploaded part's content type is missing or not `image/*` | `{"detail": "Upload an image file."}` |
-| `422 Unprocessable Entity` | The `file` form field is missing | FastAPI validation error (`{"detail": [{"type": "missing", "loc": ["body", "file"], ...}]}`) |
-| `500 Internal Server Error` | The file says it is an image but cannot be decoded | `Internal Server Error` |
+| `400 Bad Request` | Not an image, unsupported extension, empty file, or the image cannot be decoded | `{"detail": "..."}` |
+| `413 Payload Too Large` | File is larger than 10 MB | `{"detail": "Image must be 10 MB or smaller."}` |
+| `422 Unprocessable Entity` | The `file` form field is missing | FastAPI validation error |
 
 ### Notes
 
-- The first request after the server starts is slower because the InsightFace `buffalo_l` model is loaded then and cached for later requests.
+- Both models are loaded once at server startup, so `processing_time` never includes model loading. Startup takes longer instead (the first run also downloads CLIP from Hugging Face).
 - Uploaded images are written to a temporary file, processed, and deleted immediately. Nothing is stored.
-- Scores come from L2-normalized 512-dimension ArcFace embeddings compared with L2-normalized per-celebrity centroids.

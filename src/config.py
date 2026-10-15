@@ -29,8 +29,26 @@ UNKNOWN_PEOPLE_DIR = ROOT_DIR / "unknown_people"
 UNKNOWN_TEST_IMAGES = 2
 
 MODEL_NAME = "buffalo_l"
-DETECTION_SIZE = (640, 640)
+# Small, fast face detector (buffalo_s det_500m, auto-downloaded) at 320.
+# ArcFace still comes from MODEL_NAME. For the original detector, set
+# DETECTOR_PACK = None and DETECTION_SIZE = (640, 640), then rebuild centroids.
+DETECTOR_PACK = "buffalo_s"
+DETECTOR_FILE = "det_500m.onnx"
+DETECTION_SIZE = (320, 320)
 SIMILARITY_THRESHOLD = 0.80
+
+# General object recognition (CLIP). Kept in its own table: CLIP and ArcFace
+# embeddings live in different feature spaces and are never compared.
+OBJECT_TRAIN_DIR = ROOT_DIR / "object_dataset" / "train"
+OBJECT_TEST_DIR = ROOT_DIR / "object_dataset" / "test"
+OBJECT_METADATA_XLSX = METADATA_DIR / "objects.xlsx"
+CLIP_MODEL_NAME = "openai/clip-vit-base-patch32"
+# CLIP image model exported to ONNX on first use (~350 MB, not in git):
+# same embeddings as PyTorch, about 2x faster on CPU.
+CLIP_ONNX_PATH = ROOT_DIR / "models" / "clip_vision.onnx"
+OBJECT_SIMILARITY_THRESHOLD = 0.80
+
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 MIN_IMAGE_SIDE = 160
 MIN_FACE_AREA_RATIO = 0.03
