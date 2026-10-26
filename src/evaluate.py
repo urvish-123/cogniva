@@ -8,7 +8,7 @@ expected_name is a celebrity name, "Unknown", or a status such as
 "multiple_faces" / "no_face".
 
 Example:
-celebrity_dataset/Virat_Kohli/001.jpg,Virat Kohli,Celebrity dataset image
+dataset/Celebrity/Virat_Kohli/001.jpg,Virat Kohli,Celebrity dataset image
 test_images/unknown_marmik_01.jpg,Unknown,Unknown person
 test_images/multiple_faces_test.jpg,multiple_faces,Multiple faces
 """

@@ -2,29 +2,46 @@
 
 ## Celebrity + object recognition (merged)
 
-Upload one image and the app tells you whether it shows a **celebrity** or an **object**, and how long recognition took.
+Upload one image and the app tells you whether it shows a **celebrity** or an **object**, and how long recognition took. With a patient ID, it tells you which of that patient's registered people it shows.
 
 ```text
+POST /recognize[?patient_id=P001]  (file + optional patient_id)
+
+with patient_id ─► face detection ─► that patient's people ONLY
+                     ├─ best match >= 0.45                 ─► type: patient
+                     └─ no match / no face / many faces    ─► type: unknown
+                    (unknown patient_id ─► HTTP 404; celebrities and objects never searched)
+
+without patient_id:
 image ─► face detection (InsightFace)
-          ├─ face matches a celebrity (ArcFace)      ─► type: celebrity
-          ├─ more than one face                     ─► type: unknown
-          └─ no face / unknown face ─► CLIP object match ─► type: object | unknown
+          ├─ celebrity best match >= 80%                   ─► type: celebrity
+          ├─ no match                                      ─► type: unknown (not recognized)
+          ├─ more than one face                            ─► type: unknown
+          └─ no face ─► CLIP object match ─► type: object | unknown
 ```
 
 - Celebrities: ArcFace embeddings vs the `celebrities` table (unchanged logic below).
-- Objects: CLIP `openai/clip-vit-base-patch32` embeddings vs the `objects` table. Merged from the object-recognition project (8 classes, 80/20 train/test split in `object_dataset/`).
+- Objects: CLIP `openai/clip-vit-base-patch32` embeddings vs the `objects` table. Merged from the object-recognition project (8 classes, 80/20 train/test split in `dataset/Objects/`).
 - The two embedding types are stored in separate tables and never compared with each other.
 - Every response includes `processing_time` (`face_ms`, `object_ms`, `total_ms`, `request_ms`).
 
 Object setup (once, after `pip install -r requirements.txt`):
 
 ```bash
-python -m src.generate_object_centroids   # object_dataset/train -> objects table
-python -m src.evaluate_objects            # accuracy + time per image on object_dataset/test
+python -m src.generate_object_centroids   # dataset/Objects/train -> objects table
+python -m src.evaluate_objects            # accuracy + time per image on dataset/Objects/test
 python -m src.pipeline path/to/image.jpg  # one image through the full pipeline
 ```
 
 Object categories come from `metadata/objects.xlsx` (`Object`, `Category` columns).
+
+## Patient people (`POST /recognize?patient_id=P001`)
+
+When the request carries a `patient_id` form field (e.g. `P001`), the face is compared with that patient's people **only**, from `dataset/Patient/<patient_id>/<Person>/*.jpg` (case-insensitive: `p001` finds `P001`). The best match at or above 0.45 returns `type: patient` with the person folder name (`Son_of_amitab` → "Son of amitab"); otherwise `type: unknown`. Celebrities and objects are never searched, so the request costs one face embedding plus one small matrix product. An unknown patient ID returns HTTP 404. Without `patient_id`, patients are never searched.
+
+The patient threshold is lower than the celebrity one because patients register only a few photos per person (see the comment in `src/config.py` for the measurements).
+
+The API indexes every patient at startup and keeps them in memory; a person folder that changes is re-embedded on the next request, nothing else. To index ahead of time run `python -m src.generate_patient_centroids` (`--patient P001`, `--rebuild`). See `dataset/Patient/README.md`.
 
 ## What this project does
 
@@ -58,7 +75,7 @@ Kaggle dataset
     ↓
 prepare_kaggle_dataset.py
     ↓
-celebrity_dataset/
+dataset/Celebrity/
     ↓
 preprocess.py
     ↓
@@ -206,7 +223,7 @@ Only the final centroid is persisted; individual image embeddings are held in me
 
 ### Training and test images
 
-Every clean image of a celebrity is used to build their centroid. Every image in `celebrity_dataset/` (for celebrities in the metadata) is also used as a test case, read in place. Because these images are also used for training, the accuracy shows how well the database fits the dataset, not how well it handles new photos.
+Every clean image of a celebrity is used to build their centroid. Every image in `dataset/Celebrity/` (for celebrities in the metadata) is also used as a test case, read in place. Because these images are also used for training, the accuracy shows how well the database fits the dataset, not how well it handles new photos.
 
 Only people listed in `metadata/celebrities.xlsx` are stored in the database. Folders for anyone else are skipped.
 
@@ -216,7 +233,7 @@ The same command also writes `metadata/test_cases.csv`:
 
 | Test | Image(s) | Expected |
 |---|---|---|
-| Celebrity dataset image | every image in `celebrity_dataset/<name>/` | Correct celebrity |
+| Celebrity dataset image | every image in `dataset/Celebrity/<name>/` | Correct celebrity |
 | Different lighting | `lighting_dark_test.jpg` (darkened dataset image) | Correct celebrity |
 | Unknown person | `unknown_<name>_XX.jpg` | Unknown |
 | Multiple faces | `multiple_faces_test.jpg` (two dataset faces side by side) | multiple_faces |
@@ -227,7 +244,7 @@ The same command also writes `metadata/test_cases.csv`:
 
 To add photos for a celebrity:
 
-1. Put 20–50 clear photos (one face each) in their folder, e.g. `celebrity_dataset/Salman_Khan/`. An empty folder already exists for every celebrity in the Excel file.
+1. Put 20–50 clear photos (one face each) in their folder, e.g. `dataset/Celebrity/Salman_Khan/`. An empty folder already exists for every celebrity in the Excel file.
 2. Re-run cleaning and the database build:
    ```bash
    python -m src.preprocess
@@ -319,7 +336,10 @@ Cogniva_Celebrity_Recognition_Final/
 │   └── celebrity_embeddings_dump.sql
 ├── docs/
 │   └── API.md
-├── celebrity_dataset/
+├── dataset/
+│   ├── Celebrity/            <Name>/*.jpg
+│   ├── Objects/              {train,test}/<Object>/*.jpg
+│   └── Patient/              <PatientID>/<Person>/*.jpg
 ├── cleaned_dataset/
 ├── metadata/
 │   ├── celebrities.xlsx

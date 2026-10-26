@@ -23,3 +23,18 @@ CREATE TABLE IF NOT EXISTS celebrities (
 );
 
 CREATE INDEX IF NOT EXISTS idx_celebrities_name ON celebrities(name);
+
+-- People registered by a patient (dataset/Patient/<patient_id>/<folder>).
+-- Searched only by requests carrying that patient_id. Rebuildable index:
+-- the API fills and updates it from the folders by itself.
+CREATE TABLE IF NOT EXISTS patient_people (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id         TEXT    NOT NULL,                     -- upper-case folder name, e.g. "P001"
+    folder              TEXT    NOT NULL,                     -- person folder, e.g. "Son_of_amitab" (shown as "Son of amitab")
+    centroid_embedding  BLOB    NOT NULL,                     -- L2-normalized float32 vector (ArcFace, little-endian)
+    embedding_dimension INTEGER NOT NULL,
+    sample_count        INTEGER NOT NULL,                     -- photos averaged into the centroid
+    folder_mtime        REAL    NOT NULL,                     -- folder modification time when embedded; a change triggers re-embedding
+    created_at          TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(patient_id, folder)
+);

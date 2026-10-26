@@ -7,7 +7,7 @@ FastAPI backend defined in `app/main.py`.
 | Base URL (local) | `http://127.0.0.1:8000` |
 | Start server | `uvicorn app.main:app --reload` (from the project root) |
 | Authentication | None |
-| Interactive docs | `http://127.0.0.1:8000/docs` (Swagger UI), `/redoc` |
+| Interactive docs | `http.0.0.1:8000/docs://127` (Swagger UI), `/redoc` |
 | OpenAPI schema | `http://127.0.0.1:8000/openapi.json` |
 | CORS | Allowed origins: `http://localhost:5173`, `http://127.0.0.1:5173` (React dev server) |
 
@@ -17,7 +17,7 @@ FastAPI backend defined in `app/main.py`.
 |---|---|---|
 | `GET` | `/` | Minimal built-in HTML upload page |
 | `GET` | `/health` | Service and database status |
-| `POST` | `/recognize` | Identify the celebrity or object in an uploaded image |
+| `POST` | `/recognize` | Identify the celebrity or object in an uploaded image; with `patient_id`, identify which of that patient's people it shows |
 
 ---
 
@@ -53,40 +53,76 @@ Two specialised models are used, and their embeddings are never compared with ea
 
 | Step | Model | Compared against |
 |---|---|---|
-| 1. Face | InsightFace `buffalo_l` (RetinaFace detection + ArcFace) | `celebrities` table |
-| 2. Object | CLIP `openai/clip-vit-base-patch32` | `objects` table |
+| Face, patient (only with `patient_id`) | InsightFace `buffalo_l` (ArcFace) | `patient_people` rows of that patient only |
+| Face, celebrity | InsightFace `buffalo_l` (RetinaFace detection + ArcFace) | `celebrities` table |
+| Object | CLIP `openai/clip-vit-base-patch32` | `objects` table |
 
 Decision logic (`src/pipeline.py`):
 
-1. Run face recognition (unchanged celebrity logic, threshold `SIMILARITY_THRESHOLD`).
-   - Celebrity match → `type: "celebrity"`, CLIP is skipped.
+**A. With `patient_id`** (patient flow; folder `dataset/Patient/<patient_id>`, case-insensitive):
+
+- The face is compared with that patient's people **only**. Celebrities and CLIP never run.
+- Best match ≥ `PATIENT_SIMILARITY_THRESHOLD` (0.45) → `type: "patient"` with the person's name (folder name, `_` shown as spaces).
+- No match, no face, more than one face, or no registered people → `type: "unknown"`; `patient.status` says which.
+- No folder for that patient → `404 Not Found`.
+
+**B. Without `patient_id`** (general flow):
+
+1. Run face recognition.
+   - Celebrity best match ≥ `SIMILARITY_THRESHOLD` (0.80) → `type: "celebrity"`, CLIP is skipped.
+   - No match → `type: "unknown"` (not recognized), CLIP is skipped.
    - More than one face → `type: "unknown"` (one face per image, as before).
-2. No face, or a face that matches no celebrity → run CLIP object recognition (threshold `OBJECT_SIMILARITY_THRESHOLD`).
+2. No face → run CLIP object recognition (threshold `OBJECT_SIMILARITY_THRESHOLD`).
    - Object match → `type: "object"`.
    - Otherwise → `type: "unknown"`.
 
-Both thresholds are in `src/config.py`. A score must be **greater than** the threshold to count as a match.
+All thresholds are in `src/config.py`. Face matches count when the score is **greater than or equal to** the threshold; objects when it is **greater than** it.
 
 ### Request
 
-`Content-Type: multipart/form-data`
+`POST /recognize?patient_id=P001` — `Content-Type: multipart/form-data`
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `file` | file | Yes | JPG, PNG or WEBP image, at most 10 MB |
+| Field | In | Type | Required | Description |
+|---|---|---|---|---|
+| `patient_id` | query | string | No | e.g. `P001`. Letters, digits, `_`, `-`; case-insensitive. Empty = not given. A `patient_id` form field is also accepted; the query parameter wins when both are sent |
+| `file` | form | file | Yes | JPG, PNG or WEBP image, at most 10 MB |
 
 ```bash
 curl -X POST http://127.0.0.1:8000/recognize -F "file=@test_images/virat_test.jpg"
+curl -X POST "http://127.0.0.1:8000/recognize?patient_id=P001" -F "file=@photo.jpg"
 ```
+
+Patient people come from `dataset/Patient/<patient_id>/<Person>/*.jpg`. Every patient is indexed at server startup and kept in memory. A request only lists the patient's person folders to detect changes; a person folder whose photos were added, removed or renamed is re-embedded on the next request (a few hundred ms per photo, once), nothing else. `python -m src.generate_patient_centroids [--patient P001] [--rebuild]` builds the index ahead of time.
 
 ### Response `200 OK`
 
 | Field | Type | Description |
 |---|---|---|
-| `type` | string | `"celebrity"`, `"object"` or `"unknown"` |
-| `celebrity` | object | Face recognition result (always present). Same fields as before: `status` is `match`, `unknown`, `no_face`, `multiple_faces` or `database_empty` |
-| `object` | object or null | CLIP result, or `null` when CLIP was skipped. `status` is `match`, `unknown` or `database_empty` |
+| `type` | string | `"patient"`, `"celebrity"`, `"object"` or `"unknown"` |
+| `patient` | object or null | Patient flow only, else `null`. `status` is `match` (with `name`, `score`, `sample_count`), `unknown`, `no_face`, `multiple_faces` or `empty` (no registered people with a usable photo). Always has `patient_id`; `match`/`unknown` also have `threshold` and `top_matches` |
+| `celebrity` | object or null | General flow only, else `null`. `status` is `match`, `unknown`, `no_face`, `multiple_faces` or `database_empty` |
+| `object` | object or null | CLIP result, or `null` when CLIP did not run. `status` is `match`, `unknown` or `database_empty` |
 | `processing_time` | object | Milliseconds: `face_ms`, `object_ms` (only if CLIP ran), `total_ms` (recognition), `request_ms` (validation + recognition) |
+
+#### Patient image (`patient_id=P001`)
+
+```json
+{
+  "type": "patient",
+  "patient": {
+    "status": "match",
+    "patient_id": "P001",
+    "name": "Son of amitab",
+    "score": 0.7612,
+    "threshold": 0.45,
+    "sample_count": 8,
+    "top_matches": [{ "name": "Son of amitab", "score": 0.7612 }, { "name": "Wife of amitab", "score": 0.0531 }]
+  },
+  "celebrity": null,
+  "object": null,
+  "processing_time": { "face_ms": 62.3, "total_ms": 62.3, "request_ms": 65.2 }
+}
+```
 
 #### Celebrity image
 
@@ -144,6 +180,7 @@ curl -X POST http://127.0.0.1:8000/recognize -F "file=@test_images/virat_test.jp
 | HTTP code | When | Body |
 |---|---|---|
 | `400 Bad Request` | Not an image, unsupported extension, empty file, or the image cannot be decoded | `{"detail": "..."}` |
+| `404 Not Found` | `patient_id` given but there is no folder `dataset/Patient/<patient_id>` | `{"detail": "Patient P999 not found."}` |
 | `413 Payload Too Large` | File is larger than 10 MB | `{"detail": "Image must be 10 MB or smaller."}` |
 | `422 Unprocessable Entity` | The `file` form field is missing | FastAPI validation error |
 

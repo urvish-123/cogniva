@@ -55,3 +55,9 @@ def test_multiple_faces(monkeypatch):
 def test_no_face(monkeypatch):
     fake_pipeline(monkeypatch, [1, 0], faces=0)
     assert recognize_image("x.jpg")["status"] == "no_face"
+
+
+def test_threshold_is_inclusive(monkeypatch):
+    fake_pipeline(monkeypatch, [1, 0])
+    assert recognize_image("x.jpg", threshold=1.0)["status"] == "match"
+

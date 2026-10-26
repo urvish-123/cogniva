@@ -28,6 +28,33 @@ def image_files(directory: Path):
     )
 
 
+def folder_centroid(images):
+    """Mean of the normalized ArcFace embeddings of single-face images.
+    Returns (centroid or None, embeddings used, images skipped)."""
+    embeddings = []
+    skipped = 0
+
+    for image_path in images:
+        try:
+            image = read_image(image_path)
+            faces = detect_faces(image)
+
+            if len(faces) != 1:
+                skipped += 1
+                continue
+
+            embeddings.append(normalized_embedding(faces[0]))
+        except Exception:
+            skipped += 1
+
+    if not embeddings:
+        return None, 0, skipped
+
+    centroid = np.mean(np.vstack(embeddings), axis=0)
+    centroid /= np.linalg.norm(centroid)
+    return centroid, len(embeddings), skipped
+
+
 def copy_test_image(source: Path, name: str):
     destination = TEST_IMAGES_DIR / name
     shutil.copy2(source, destination)
@@ -133,29 +160,11 @@ def main(dataset: Path):
             too_few.append(name)
             continue
 
-        embeddings = []
-        skipped = 0
+        centroid, count, skipped = folder_centroid(images)
 
-        for image_path in images:
-            try:
-                image = read_image(image_path)
-                faces = detect_faces(image)
-
-                if len(faces) != 1:
-                    skipped += 1
-                    continue
-
-                embeddings.append(normalized_embedding(faces[0]))
-            except Exception:
-                skipped += 1
-
-        if not embeddings:
+        if centroid is None:
             print(f"[SKIP] {person_dir.name}: no valid embeddings")
             continue
-
-        matrix = np.vstack(embeddings)
-        centroid = np.mean(matrix, axis=0)
-        centroid /= np.linalg.norm(centroid)
 
         upsert_celebrity(
             name=name,
@@ -164,12 +173,12 @@ def main(dataset: Path):
             description=meta.get("description", ""),
             details=meta.get("details", {}),
             centroid=centroid,
-            sample_count=len(embeddings),
+            sample_count=count,
         )
 
         total_people += 1
         print(
-            f"[OK] {name}: {len(embeddings)} embeddings, "
+            f"[OK] {name}: {count} embeddings, "
             f"{skipped} skipped, dimension={centroid.shape[0]}"
         )
 

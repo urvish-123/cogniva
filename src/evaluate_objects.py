@@ -3,7 +3,7 @@ Evaluate the full pipeline on the held-out object test set.
 
 python -m src.evaluate_objects
 
-Each folder in object_dataset/test/ is one object class. An image passes when
+Each folder in dataset/Objects/test/ is one object class. An image passes when
 the pipeline returns type "object" with that class name.
 """
 

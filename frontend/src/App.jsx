@@ -15,7 +15,29 @@ const MESSAGES = {
   },
 };
 
+function patientMessage(patient) {
+  const id = patient.patient_id;
+  if (patient.status === "multiple_faces") return MESSAGES.multiple_faces;
+  if (patient.status === "no_face") {
+    return {
+      title: "No face detected",
+      text: "Please upload a clear photo of one person's face.",
+    };
+  }
+  if (patient.status === "empty") {
+    return {
+      title: "No registered people",
+      text: `Patient ${id} has no registered people with a usable photo yet.`,
+    };
+  }
+  return {
+    title: "Not recognized",
+    text: `This face does not match any person registered for patient ${id}.`,
+  };
+}
+
 function unknownMessage(result) {
+  if (result.patient) return patientMessage(result.patient);
   const faceStatus = result.celebrity?.status;
   if (faceStatus === "multiple_faces") return MESSAGES.multiple_faces;
   if (faceStatus === "database_empty" && result.object?.status === "database_empty") {
@@ -66,6 +88,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [patientId, setPatientId] = useState("");
   const inputRef = useRef(null);
 
   // Free the preview URL when the image changes.
@@ -103,7 +126,12 @@ export default function App() {
       const upload = await shrinkImage(file);
       const form = new FormData();
       form.append("file", upload, upload.name);
-      const response = await fetch("/recognize", { method: "POST", body: form });
+      // With a patient ID, only that patient's people are searched.
+      const id = patientId.trim();
+      const url = id
+        ? `/recognize?patient_id=${encodeURIComponent(id)}`
+        : "/recognize";
+      const response = await fetch(url, { method: "POST", body: form });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Recognition failed.");
       setResult(data);
@@ -163,6 +191,17 @@ export default function App() {
 
               <div className="side">
                 <p className="file-name" title={file.name}>{file.name}</p>
+
+                {!result && (
+                  <input
+                    className="patient-id"
+                    type="text"
+                    placeholder="Patient ID (optional, e.g. P001)"
+                    value={patientId}
+                    onChange={(e) => setPatientId(e.target.value)}
+                    disabled={loading}
+                  />
+                )}
 
                 {!result && (
                   <button className="btn primary" onClick={recognize}
@@ -233,6 +272,23 @@ function DetailsPanel({ result }) {
 }
 
 function ResultCard({ result }) {
+  if (result.type === "patient") {
+    const match = result.patient;
+    return (
+      <div className="result match">
+        <span className="result-label">Patient person identified</span>
+        <h2>{match.name}</h2>
+        <div className="result-meta">
+          <span className="chip">Patient {match.patient_id}</span>
+          <span className="score">
+            Similarity {(match.score * 100).toFixed(1)}%
+          </span>
+        </div>
+        <ProcessingTime time={result.processing_time} />
+      </div>
+    );
+  }
+
   if (result.type === "celebrity" || result.type === "object") {
     const isCelebrity = result.type === "celebrity";
     const match = isCelebrity ? result.celebrity : result.object;

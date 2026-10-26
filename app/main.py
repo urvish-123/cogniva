@@ -1,14 +1,16 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 import time
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
 from src.config import ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES
+from src.patient import PatientNotFound, load_all_patients
 from src.database import database_available, get_all_objects
 from src.face_engine import get_face_engine
 from src.object_engine import get_clip_model
@@ -43,6 +45,9 @@ async def lifespan(app):
     get_face_engine()
     get_clip_model()
     warm_up()
+    # Every patient's people in memory, so even the first request for a
+    # patient only compares embeddings (new photos are embedded here once).
+    load_all_patients()
     yield
 
 
@@ -80,6 +85,8 @@ pre{background:#f6f6f6;padding:16px;border-radius:8px;white-space:pre-wrap}
 <p>Upload a celebrity photo or an object photo.</p>
 <input id="file" type="file" accept="image/*">
 <br>
+<input id="patient" type="text" placeholder="Patient ID (optional, e.g. P001)">
+<br>
 <button onclick="recognize()">Recognize</button>
 <pre id="result">Waiting for image...</pre>
 </div>
@@ -89,8 +96,10 @@ async function recognize(){
   const out=document.getElementById('result');
   if(!f){out.textContent='Please select an image.';return;}
   const form=new FormData(); form.append('file',f);
+  const id=document.getElementById('patient').value.trim();
+  const url=id?'/recognize?patient_id='+encodeURIComponent(id):'/recognize';
   out.textContent='Processing...';
-  const r=await fetch('/recognize',{method:'POST',body:form});
+  const r=await fetch(url,{method:'POST',body:form});
   const data=await r.json();
   out.textContent=JSON.stringify(data,null,2);
 }
@@ -115,8 +124,17 @@ def health():
 
 
 @app.post("/recognize")
-async def recognize(file: UploadFile = File(...)):
+async def recognize(file: UploadFile = File(...),
+                    patient_id: Optional[str] = Query(None),
+                    form_patient_id: Optional[str] = Form(
+                        None, alias="patient_id")):
+    """Without patient_id: celebrity, then object recognition.
+    With patient_id (e.g. POST /recognize?patient_id=P001): only the
+    people in dataset/Patient/<patient_id>/ are searched.
+    The query parameter wins; a patient_id form field is still accepted."""
     received = time.perf_counter()
+    patient_id = ((patient_id or "").strip()
+                  or (form_patient_id or "").strip() or None)
 
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Upload an image file.")
@@ -136,7 +154,11 @@ async def recognize(file: UploadFile = File(...)):
     if image is None:
         raise HTTPException(status_code=400, detail="Invalid or corrupted image.")
 
-    result = recognize_pipeline(image)
+    try:
+        result = recognize_pipeline(image, patient_id=patient_id)
+    except PatientNotFound:
+        raise HTTPException(status_code=404,
+                            detail=f"Patient {patient_id} not found.")
 
     # Upload validation + recognition, i.e. the full server-side time.
     result["processing_time"]["request_ms"] = round(
