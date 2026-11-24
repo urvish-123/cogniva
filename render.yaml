@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: cogniva-celebrity-recognition
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: CELEBRITY_DB_PATH
+        value: /var/data/database/celebrity_embeddings.db
+      - key: INSIGHTFACE_HOME
+        value: /var/data/.insightface
+      - key: HF_HOME
+        value: /var/data/.cache/huggingface
+      - key: TRANSFORMERS_CACHE
+        value: /var/data/.cache/huggingface
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    disk:
+      name: cogniva-data
+      mountPath: /var/data
+      sizeGB: 10

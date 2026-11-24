@@ -2,16 +2,19 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 import time
+import os
+import shutil
 
 import cv2
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.config import ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES
 from src.patient import PatientNotFound, load_all_patients
-from src.database import database_available, get_all_objects
+from src.database import database_available, get_all_objects, init_database
 from src.face_engine import get_face_engine
 from src.object_engine import get_clip_model
 from src.pipeline import recognize as recognize_pipeline
@@ -39,9 +42,27 @@ def decode_image(data: bytes):
     return image
 
 
+def prepare_database():
+    database_path = Path(os.getenv(
+        "CELEBRITY_DB_PATH",
+        str(Path(__file__).resolve().parents[1]
+            / "database" / "celebrity_embeddings.db"),
+    ))
+    if not database_path.exists():
+        database_path.parent.mkdir(parents=True, exist_ok=True)
+        bundled_database = (
+            Path(__file__).resolve().parents[1]
+            / "database" / "celebrity_embeddings.db"
+        )
+        if bundled_database.exists():
+            shutil.copy2(bundled_database, database_path)
+    init_database()
+
+
 @asynccontextmanager
 async def lifespan(app):
     # Load both models once at startup so request times exclude model loading.
+    prepare_database()
     get_face_engine()
     get_clip_model()
     warm_up()
@@ -60,7 +81,14 @@ app = FastAPI(
 # React dev server (frontend/) runs on a different port.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ] + (
+        [origin.strip() for origin in
+         os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+         if origin.strip()]
+    ),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -164,3 +192,9 @@ async def recognize(file: UploadFile = File(...),
     result["processing_time"]["request_ms"] = round(
         (time.perf_counter() - received) * 1000, 1)
     return result
+
+
+frontend_dist = Path(__file__).resolve().parents[1] / "frontend" / "dist"
+if frontend_dist.is_dir():
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True),
+              name="frontend")

@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+import os
 
 import cv2
 import numpy as np
@@ -23,7 +24,9 @@ def get_face_engine() -> FaceAnalysis:
     # Swap in the small detector from another pack (e.g. buffalo_s
     # det_500m), keeping MODEL_NAME's ArcFace so embeddings stay comparable.
     if DETECTOR_PACK:
-        pack_dir = ensure_available("models", DETECTOR_PACK, root="~/.insightface")
+        insightface_home = os.getenv("INSIGHTFACE_HOME", "~/.insightface")
+        pack_dir = ensure_available(
+            "models", DETECTOR_PACK, root=insightface_home)
         detector = model_zoo.get_model(
             str(Path(pack_dir) / DETECTOR_FILE),
             providers=["CPUExecutionProvider"])
